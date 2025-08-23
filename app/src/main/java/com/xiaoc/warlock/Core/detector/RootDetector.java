@@ -1,6 +1,7 @@
 package com.xiaoc.warlock.Core.detector;
 
 import android.content.Context;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 
 import com.xiaoc.warlock.BuildConfig;
@@ -46,6 +47,7 @@ public class RootDetector extends BaseDetector {
         checkMountFile();
         checkMapsFile();
         checkTeeForLocked();
+        //checkKnownRootApps();
     }
     private  void checkTeeForLocked() {
 
@@ -344,4 +346,75 @@ public class RootDetector extends BaseDetector {
             XLog.e(TAG, "Failed to check maps file", e);
         }
     }
+
+    /**
+     * 检测已知的Root管理应用
+     * 通过尝试启动特定Activity来检测Root应用是否已安装
+     */
+    private void checkKnownRootApps() {
+        try {
+            // 定义已知的Root应用包名和Activity
+            String[][] knownRootApps = {
+                {"com.dergoogler.mmrl", "com.dergoogler.mmrl.ui.activity.webui.WebUIActivity"},
+                {"com.rifsxd.ksunext", "com.rifsxd.ksunext.ui.webui.WebUIActivity"},
+                {"com.topjohnwu.magisk", "com.topjohnwu.magisk.ui.surequest.SuRequestActivity"},
+                {"com.tsng.hidemyapplist", "com.google.android.gms.ads.AdActivity"},
+                {"io.github.huskydg.magisk", "com.topjohnwu.magisk.ui.surequest.SuRequestActivity"},
+                {"io.github.vvb2060.magisk", "com.topjohnwu.magisk.ui.surequest.SuRequestActivity"},
+                {"me.bmax.apatch", "me.bmax.apatch.ui.WebUIActivity"},
+                {"me.weishu.kernelsu", "me.weishu.kernelsu.ui.webui.WebUIActivity"}
+            };
+
+            List<String> foundApps = new ArrayList<>();
+            XLog.d(TAG, "Checking for " + knownRootApps.length + " known root apps");
+
+            for (String[] appActivity : knownRootApps) {
+                String packageName = appActivity[0];
+                String activityName = appActivity[1];
+
+                try {
+                    Intent intent = new Intent();
+                    intent.setPackage(packageName);
+                    intent.setClassName(packageName, activityName);
+                    intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+
+                    try {
+                        context.startActivity(intent);
+                        // 如果能成功启动，说明应用存在
+                        XLog.d(TAG, "Successfully started activity for root app: " + packageName);
+                        foundApps.add(packageName);
+                    } catch (SecurityException e) {
+                        // SecurityException表示应用存在但无法启动
+                        XLog.d(TAG, "SecurityException for root app " + packageName + ": " + e.getMessage());
+                        foundApps.add(packageName);
+                    } catch (Exception e) {
+                        // 其他异常可能表示应用未安装
+                        XLog.d(TAG, "App not installed: " + packageName);
+                    }
+                } catch (Exception e) {
+                    XLog.e(TAG, "Error checking for root app " + packageName, e);
+                }
+            }
+
+            if (!foundApps.isEmpty()) {
+                XLog.d(TAG, "Found " + foundApps.size() + " root apps");
+                StringBuilder details = new StringBuilder();
+                for (String app : foundApps) {
+                    details.append(app).append("\n");
+                }
+
+                InfoItem warning = new WarningBuilder("checkKnownRootApps", null)
+                        .addDetail("check", details.toString().trim())
+                        .addDetail("level", "medium")
+                        .build();
+
+                reportAbnormal(warning);
+            } else {
+                XLog.d(TAG, "No known root apps found");
+            }
+        } catch (Exception e) {
+            XLog.e(TAG, "Failed to check known root apps", e);
+        }
+    }
 }
+    

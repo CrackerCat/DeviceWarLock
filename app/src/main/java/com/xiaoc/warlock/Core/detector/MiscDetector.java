@@ -597,6 +597,27 @@ public class MiscDetector extends BaseDetector {
         }
     }
 
+    /**
+     * 检测Dalvik虚拟机dex2oat编译标志
+     * 检查dalvik.vm.dex2oat-flags属性，如果包含--inline-max-code-units=0可能表明性能优化被禁用
+     */
+    private void checkDex2OatFlags() {
+        try {
+            String dex2oatFlags = MiscUtil.getSystemProperty("dalvik.vm.dex2oat-flags");
+            if (dex2oatFlags != null && dex2oatFlags.contains("--inline-max-code-units=0")) {
+                InfoItem warning = new WarningBuilder("checkDex2OatFlags", null)
+                        .addDetail("check", dex2oatFlags)
+                        .addDetail("level", "medium")
+                        .build();
+
+                reportAbnormal(warning);
+               // XLog.d(TAG, "检测到异常的dex2oat编译标志: " + dex2oatFlags);
+            }
+        } catch (Exception e) {
+            XLog.e(TAG, "检查dex2oat标志失败", e);
+        }
+    }
+
     @Override
     public void detect() {
         checkReflectionAvailable();
@@ -613,5 +634,6 @@ public class MiscDetector extends BaseDetector {
         checkAllowMockLocation();
         checkMockLocationApps();
         checkScreenLock();
+        checkDex2OatFlags();
     }
 }

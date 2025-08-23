@@ -16,12 +16,17 @@ public:
 
 private:
     static const std::string CHECK_SYSTEM;
-
+    static const std::string CHECK_KSU;
+    static const std::string CHECK_ZYGISK;
+    static const std::string CHECK_PTY;
     bool checkDmVerity();
     bool checkSystemPartition();
     std::string calculateSystemHash();
     bool checkAVB();
+    static void checkKsu(JNIEnv* env, jobject callback);
+    static bool checkZygisk();
     std::string getSystemDetails();
+    void checkPty(JNIEnv* env, jobject callback);
 };
 
 #endif

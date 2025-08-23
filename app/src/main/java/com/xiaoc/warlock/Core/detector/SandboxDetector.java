@@ -88,7 +88,7 @@ public class SandboxDetector extends BaseDetector  {
             }
 
             String output = result.getSuccessMsg();
-            XLog.d("tttg",output);
+            //XLog.d("tttg",output);
             String[] lines = output.split("\n");
             int processCount = 0;
             StringBuilder processDetails = new StringBuilder();

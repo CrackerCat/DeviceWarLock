@@ -16,7 +16,8 @@ void NativeDetector::initDetectors() {
     detectors.push_back(std::make_unique<VirtualDetector>());
     detectors.push_back(std::make_unique<FridaDetector>());
     detectors.push_back(std::make_unique<MiscDetector>());
-    //detectors.push_back(std::make_unique<SystemDetector>());
+    detectors.push_back(std::make_unique<SystemDetector>());
+    detectors.push_back(std::make_unique<HookDetector>());
 
     // 可以添加其他检测器
 }

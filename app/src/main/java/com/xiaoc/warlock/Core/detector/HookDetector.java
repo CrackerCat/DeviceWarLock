@@ -5,6 +5,7 @@ import android.os.Debug;
 
 import com.xiaoc.warlock.Core.BaseDetector;
 import com.xiaoc.warlock.Util.WarningBuilder;
+import com.xiaoc.warlock.Util.XLog;
 import com.xiaoc.warlock.ui.adapter.InfoItem;
 
 import java.io.BufferedReader;
@@ -102,6 +103,7 @@ public class HookDetector extends BaseDetector {
     public  void hasRWXSegments() {
         try {
             List<SuspiciousSegment> segments = findRWXSegments();
+            XLog.i("not data?");
             if (!segments.isEmpty()){
                 InfoItem warning = new WarningBuilder("checkRWXSegments", null)
                         .addDetail("check", String.valueOf(true))

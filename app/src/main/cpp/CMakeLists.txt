@@ -52,6 +52,7 @@ set(SOURCE_FILES
         src/netlink/ifaddrs.cpp
         src/netlink/NetlinkConnection.cpp
         src/detector/SystemDetector.cpp
+        src/detector/HookDetector.cpp
         ${DETECTOR_SOURCES}
         ${syscall}
         ${CRYPTO_SOURCES}
@@ -73,12 +74,14 @@ add_library(warlockServer SHARED ${ISOLATED_SOURCE_FILES})
 # 查找系统库
 find_library(log-lib log)
 find_library(mediandk-lib mediandk)
+find_library(z-lib z)
 
 # 配置主库
 target_include_directories(warlockCore PRIVATE ${rapidjson_SOURCE_DIR}/include)
 target_link_libraries(warlockCore
         ${log-lib}
         ${mediandk-lib}
+        ${z-lib}
 )
 
 # 配置隔离进程库

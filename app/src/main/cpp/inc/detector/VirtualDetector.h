@@ -20,6 +20,7 @@ public:
 
 private:
     static const std::string CHECK_BRAND_SERVICES;
+    static const std::string CHECK_ARM_REGISTERS;
 
     static const std::string CHECK_VIRTUAL;
     static const std::string CHECK_THERMAL;
@@ -35,10 +36,19 @@ private:
     int check_thermal_zones();  // 新增温度区检测方法
     void detectProcess(JNIEnv* env, jobject callback);  // 新增进程检测方法
     void detectBrandServices(JNIEnv* env, jobject callback);
+    void detectArmRegisters(JNIEnv* env, jobject callback);  // 新增ARM寄存器检测方法
     void checkServices(const char* services[], size_t count,
                        std::string& missingServices, bool& isAbnormal);
     bool checkServiceExists(const char* serviceName);
     std::string getServiceList();
+    
+    // ARM寄存器读取函数
+    uint64_t getMainIdRegister();
+    uint64_t getMultiprocessorAffinityRegister();
+    uint64_t getRevisionIdRegister();
+    uint64_t getProcessorFeatureRegister0();
+    uint64_t getInstructionSetAttributeRegister0();
+    std::string analyzeArmHardware();
 
 };
 

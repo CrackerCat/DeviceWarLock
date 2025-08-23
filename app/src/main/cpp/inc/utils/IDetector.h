@@ -13,7 +13,4 @@ public:
 // Created by 17267 on 2024-12-24.
 //
 
-#ifndef WARLOCK_IDETECTOR_H
-#define WARLOCK_IDETECTOR_H
-
-#endif //WARLOCK_IDETECTOR_H
+#

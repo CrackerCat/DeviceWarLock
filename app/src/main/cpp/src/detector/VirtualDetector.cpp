@@ -6,9 +6,11 @@ const std::string VirtualDetector::CHECK_VIRTUAL = "checkVirtual_native";
 const std::string VirtualDetector::CHECK_THERMAL = "checkThermal_native";
 const std::string VirtualDetector::CHECK_PROCESS = "checkProcess_native";
 const std::string VirtualDetector::CHECK_BRAND_SERVICES = "checkBrandServices_native";
+const std::string VirtualDetector::CHECK_ARM_REGISTERS = "checkArmRegisters_native";
 void VirtualDetector::detect(JNIEnv* env, jobject callback) {
     detectArch(env, callback);
     detectThermal(env, callback);
+    detectArmRegisters(env, callback);  // 添加ARM寄存器检测
 
     if (MiscUtil::SystemUtils::getSDKLevel() > __ANDROID_API_Q__) {
         detectProcess(env, callback);
@@ -185,8 +187,7 @@ int VirtualDetector::check_thermal_zones() {
 
         struct dirent* entry;
         while ((entry = readdir(dir_ptr))) {
-            if (!entry->d_name ||
-                !strcmp(entry->d_name, ".") ||
+            if (!strcmp(entry->d_name, ".") ||
                 !strcmp(entry->d_name, "..")) {
                 continue;
             }
@@ -475,4 +476,194 @@ bool VirtualDetector::checkServiceExists(const char* serviceName) {
     std::transform(name.begin(), name.end(), name.begin(), ::tolower);
 
     return lowerServiceList.find(name) != std::string::npos;
+}
+
+// ARM寄存器检测实现
+void VirtualDetector::detectArmRegisters(JNIEnv* env, jobject callback) {
+    if (!env || !callback) {
+        LOGE("Invalid JNI parameters");
+        return;
+    }
+
+    try {
+        std::string hardwareInfo = analyzeArmHardware();
+        
+        if (!hardwareInfo.empty()) {
+            DetectorUtils::reportWarning(env, callback,
+                                         CHECK_ARM_REGISTERS,
+                                         DetectorUtils::LEVEL_HIGH,
+                                         hardwareInfo);
+        } else {
+            LOGI("ARM hardware registers check passed");
+        }
+    } catch (const std::exception& e) {
+        LOGE("Error in ARM registers detection: %s", e.what());
+        return;
+    }
+}
+
+uint64_t VirtualDetector::getMainIdRegister() {
+    uint64_t register_value = 0;
+#ifdef __aarch64__
+    asm volatile(
+            "mrs %0, MIDR_EL1\n"
+            : "=r" (register_value)
+            );
+#elif defined(__arm__)
+    uint32_t reg_val;
+    asm volatile(
+            "mrc p15, 0, %0, c0, c0, 0\n"
+            : "=r" (reg_val)
+            );
+    register_value = reg_val;
+#endif
+    return register_value;
+}
+
+uint64_t VirtualDetector::getMultiprocessorAffinityRegister() {
+    uint64_t register_value = 0;
+#ifdef __aarch64__
+    asm volatile(
+            "mrs %0, MPIDR_EL1\n"
+            : "=r" (register_value)
+            );
+#elif defined(__arm__)
+    uint32_t reg_val;
+    asm volatile(
+            "mrc p15, 0, %0, c0, c0, 5\n"
+            : "=r" (reg_val)
+            );
+    register_value = reg_val;
+#endif
+    return register_value;
+}
+
+uint64_t VirtualDetector::getRevisionIdRegister() {
+    uint64_t register_value = 0;
+#ifdef __aarch64__
+    asm volatile(
+            "mrs %0, REVIDR_EL1\n"
+            : "=r" (register_value)
+            );
+#elif defined(__arm__)
+    uint32_t reg_val;
+    asm volatile(
+            "mrc p15, 0, %0, c0, c0, 6\n"
+            : "=r" (reg_val)
+            );
+    register_value = reg_val;
+#endif
+    return register_value;
+}
+
+uint64_t VirtualDetector::getProcessorFeatureRegister0() {
+    uint64_t register_value = 0;
+#ifdef __aarch64__
+    asm volatile(
+            "mrs %0, ID_AA64PFR0_EL1\n"
+            : "=r" (register_value)
+            );
+#elif defined(__arm__)
+    uint32_t reg_val;
+    asm volatile(
+            "mrc p15, 0, %0, c0, c1, 0\n"
+            : "=r" (reg_val)
+            );
+    register_value = reg_val;
+#endif
+    return register_value;
+}
+
+uint64_t VirtualDetector::getInstructionSetAttributeRegister0() {
+    uint64_t register_value = 0;
+#ifdef __aarch64__
+    asm volatile(
+            "mrs %0, ID_AA64ISAR0_EL1\n"
+            : "=r" (register_value)
+            );
+#elif defined(__arm__)
+    uint32_t reg_val;
+    asm volatile(
+            "mrc p15, 0, %0, c0, c2, 0\n"
+            : "=r" (reg_val)
+            );
+    register_value = reg_val;
+#endif
+    return register_value;
+}
+
+std::string VirtualDetector::analyzeArmHardware() {
+    std::stringstream anomalies;
+    
+    try {
+        uint64_t midr_value = getMainIdRegister();
+        unsigned char implementer_code = (midr_value >> 24) & 0xFF;
+        unsigned int part_number = (midr_value >> 4) & 0xFFF;
+        
+        // 检测可疑的实现者代码
+        if (implementer_code == 0x69) {  // Intel Corporation
+            anomalies << "检测到Intel实现者代码(0x69)，可能为x86虚拟化环境\n";
+        }
+        
+        // 检测异常的部件号
+        if (part_number == 0x000 || part_number == 0xFFF) {
+            anomalies << "检测到异常的部件号: 0x" << std::hex << part_number << std::dec << "\n";
+        }
+        
+        uint64_t mpidr_value = getMultiprocessorAffinityRegister();
+        unsigned int core_id = mpidr_value & 0xFF;
+        unsigned int cluster_id = (mpidr_value >> 8) & 0xFF;
+        
+        // 检测异常的核心配置
+        if (core_id > 16 || cluster_id > 8) {
+            anomalies << "检测到异常的核心配置 - Core ID: " << core_id 
+                     << ", Cluster ID: " << cluster_id << "\n";
+        }
+        
+        uint64_t pfr0_value = getProcessorFeatureRegister0();
+        unsigned int fp_support = (pfr0_value >> 16) & 0xF;
+        unsigned int asimd_support = (pfr0_value >> 20) & 0xF;
+        
+        // 检测缺失的浮点支持（真实ARM设备通常都有）
+        if (fp_support == 0x0) {
+            anomalies << "检测到缺失浮点支持，可能为虚拟环境\n";
+        }
+        
+        if (asimd_support == 0x0) {
+            anomalies << "检测到缺失ASIMD支持，可能为虚拟环境\n";
+        }
+        
+        uint64_t isar0_value = getInstructionSetAttributeRegister0();
+        unsigned int aes_support = (isar0_value >> 4) & 0xF;
+        unsigned int sha1_support = (isar0_value >> 8) & 0xF;
+        
+        // 检测加密指令支持异常
+        if (aes_support == 0x0 && sha1_support == 0x0) {
+            anomalies << "检测到缺失加密指令支持，可能为虚拟环境\n";
+        }
+        
+        // 添加详细的硬件信息用于分析
+        if (!anomalies.str().empty()) {
+            std::stringstream detail;
+            detail << "ARM硬件异常检测:\n" << anomalies.str() << "\n";
+            detail << "详细信息:\n";
+            detail << "MIDR_EL1: 0x" << std::hex << midr_value << std::dec;
+            detail << " (实现者: 0x" << std::hex << (unsigned int)implementer_code << std::dec;
+            detail << ", 部件: 0x" << std::hex << part_number << std::dec << ")\n";
+            detail << "MPIDR_EL1: 0x" << std::hex << mpidr_value << std::dec;
+            detail << " (核心: " << core_id << ", 集群: " << cluster_id << ")\n";
+            detail << "PFR0: 0x" << std::hex << pfr0_value << std::dec;
+            detail << " (FP: " << fp_support << ", ASIMD: " << asimd_support << ")\n";
+            detail << "ISAR0: 0x" << std::hex << isar0_value << std::dec;
+            detail << " (AES: " << aes_support << ", SHA1: " << sha1_support << ")";
+            
+            return detail.str();
+        }
+        
+    } catch (const std::exception& e) {
+        LOGE("Error reading ARM registers: %s", e.what());
+        return "ARM寄存器读取失败: " + std::string(e.what());
+    }
+    
+    return "";  // 没有检测到异常
 }

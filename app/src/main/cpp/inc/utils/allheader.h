@@ -96,4 +96,13 @@
 #include <dirent.h>
 #include <sys/syscall.h>
 #include <bits/glibc-syscalls.h>
+#include <dlfcn.h>
+#include <link.h>
+#include <elf.h>
+#include <sys/mman.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/stat.h>
+#include <zlib.h>
+
 #endif //WARLOCK_ALLHEADER_H
